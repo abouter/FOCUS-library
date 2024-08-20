@@ -1,22 +1,33 @@
-import ControlFlipMount as shutter
-import ControlLaser as las
-import ControlPulsePicker as picker
-import ControlEMCCD as EMCCD
-import FileControl
-import ControlPiezoStage as Transla
+USE_DUMMY = True
+
+if USE_DUMMY:
+    import ControlDummy as shutter
+    import ControlDummy as las
+    import ControlDummy as picker
+    import ControlDummy as EMCCD
+    import ControlDummy as Transla
+    import ControlDummy as time
+else:
+    import ControlFlipMount as shutter
+    import ControlLaser as las
+    import ControlPulsePicker as picker
+    import ControlEMCCD as EMCCD
+    import ControlPiezoStage as Transla
+    import time as time
 
 import numpy as np
 import pandas as pd
-import time as time
 import os
 import sys
 
-os.system('cls')
+import FileControl
+
+if not USE_DUMMY:
+    os.system('cls')
 
 #############################
 # Global parameter
 #############################
-
 
 Nb_Points = 100  # Number of position for the piezo
 Nb_Cycle = 10  # Number of cycle during experiment
@@ -101,7 +112,7 @@ if 'ControlConex' in sys.modules:
     y_axis = Transla.ConexController('COM13')
     print('Initialised rough translation stage')
 
-elif 'ControlPiezoStage' in sys.modules:
+elif 'ControlPiezoStage' in sys.modules or USE_DUMMY:
     piezo = Transla.PiezoControl('COM15')
     x_axis = Transla.PiezoAxisControl(piezo, 'x')
     y_axis = Transla.PiezoAxisControl(piezo, 'y')
@@ -130,7 +141,14 @@ print('Initialised Flip mount')
 # Preparation of the directory
 #############################
 print('Directory staging, please check other window')
-DirectoryPath = FileControl.PrepareDirectory(GeneralPara, InstrumentsPara)
+
+
+if USE_DUMMY:
+    DirectoryPath = 'output'
+    if(not os.path.isdir(DirectoryPath)):
+        os.makedirs(DirectoryPath)
+else:
+    DirectoryPath = FileControl.PrepareDirectory(GeneralPara, InstrumentsPara)
 
 
 #############################
@@ -150,7 +168,8 @@ for k in IteratorMes:
     print('Measurement number:{}'.format(MesNumber[IteratorMes.index]))
     TempDirPath = DirectoryPath+'/Mes'+str(MesNumber[IteratorMes.index])+'x='+str(np.round(
         Pos[IteratorMes.index, 0], 2))+'y='+str(np.round(Pos[IteratorMes.index, 1], 2))
-    os.mkdir(TempDirPath)
+    if(not os.path.isdir(TempDirPath)):
+        os.mkdir(TempDirPath)
 
     camera.SetSaveDirectory(TempDirPath.replace('/',"\\"))
     
