@@ -157,13 +157,14 @@ def ImportIMGFile(path,FileName,verbatum,graphs):
 
 
 
-def PrepareDirectory(GeneralExperimentParameter,Intruments):
+def PrepareDirectory(GeneralExperimentParameter,Intruments,path=None):
     """ This methods create and save all the parameter of the intruments. 
     It will first save the general experiments parameters and then create section for each instruments\n 
     Instruments= Nested dictionary. Each dictionary should contains all the relevant parameters.\n
     GeneralExperimentParameter= Dictionnary containning all the experiment parameter
     """
-    path=AskDirectory()
+    if path == None:
+        path=AskDirectory()
     file=open(path+'/ExperimentParameter.txt','w')
     SectionHeader="############\n"
     InstrumentsHeader="#####\n"
