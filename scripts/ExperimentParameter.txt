@@ -1,0 +1,33 @@
+############
+# General experiment parameter 
+############
+Experiment name= EMCCDRepeatDiffPos
+Nb points=150
+Distance Between Points =10
+Note=The SHG unit from Coherent was used
+
+
+############
+# Instruments parameter 
+############
+
+#####
+#Laser
+#####
+Tunable output wavelength=810
+SHG Wavelength=810
+
+#####
+#Pulse picker
+#####
+Repetition rate=8000000.0
+Power=500
+Pulse delay=210
+Pulse width=80
+Trigger=Internal
+
+#####
+#PI EMCCD
+#####
+Frame time=0.025228499999999997
+Integration Time=5.0
