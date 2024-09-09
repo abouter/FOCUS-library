@@ -3,6 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
+  - jupyter=1.1.1
+  - ipykernel=6.29.5
+  - nb_conda_kernels=2.5.1
   - pip
   - pip:
     - numpy==2.0.1
