@@ -21,7 +21,7 @@ import os
 import sys
 import FileControl
 import glob
-#import spe_loader as sl
+import spe_loader as sl
 
 class timeTraceRunner:
     def __init__(self, **kwargs):
@@ -228,29 +228,31 @@ def generateRandomParameters(Nb_Points, Nb_Cycle):
 def evaluateFitnessValues(FileDir):
     # Load experimental data
     DataTot, CycleStore = LoadDataFromFiles(FileDir)
-    Pos, p_cyc, TimeCycle, TimeSync = loadExperimentInfo(DataTot, CycleStore)
-    t_global=pd.Series(TimeCycle.cumsum().iloc[-1,:],index=range(Nb_pts))
 
     # Wavelength filter
     WavelengthFilter= [col for col in DataTot.columns if 600 <= col <= 900]
     TimeTraceU=DataTot[WavelengthFilter].sum(axis=1).unstack(level=0)
+    Nb_pts=int(TimeTraceU.shape[1])
+
+    Pos, p_cyc, TimeCycle, TimeSync = loadExperimentInfo(CycleStore, Nb_pts)
+    t_global=pd.Series(TimeCycle.cumsum().iloc[-1,:],index=range(Nb_pts))
 
     # Compute fitnesses
-    Nb_pts=int(TimeTraceU.shape[1])
     fitness_values = np.zeros(Nb_pts)
     for i in range(Nb_pts):
         temp_df=TimeTraceU.iloc[:,i].dropna()
         #integrated_int=temp_df.sum()
         ts=np.argmin(np.abs(temp_df.index-t_global[i]))
         fitness_values[i] = temp_df.iloc[ts:].mean(axis=0) # insert mean intensity of stability region as fitness value of measurement i
+    print("# FITNESS VALUES #")
+    print(fitness_values)
     return fitness_values
 
 def generateNewSolutions(df_t_cyc, df_p_cyc, df_p_cyc_calib, fitness_values):
     # TODO - implement selection and variation step of evolutionary algorithm
     return df_t_cyc, df_p_cyc, df_p_cyc_calib
 
-def loadExperimentInfo(DataTot, CycleStore):
-    Nb_pts=int(DataTot.shape[1])
+def loadExperimentInfo(CycleStore, Nb_pts):
     p_cyc=pd.DataFrame(index=range(10), columns=range(Nb_pts))
     TimeSync=pd.DataFrame(index=range(10), columns=range(Nb_pts))
     TimeCycle=pd.DataFrame(index=range(10), columns=range(Nb_pts))
@@ -276,7 +278,7 @@ def loadExperimentInfo(DataTot, CycleStore):
 def LoadDataFromFiles(FileDir):
     FileNameTimeTraceFull=FileDir+'TimeTraceFull.pkl'
     FileNameCycle=FileDir+'BatchCycle.csv'
-    print("Loading data from ", FileNameTimeTraceFull, " and ", FileNameCycle)
+    print("Loading data from", FileNameTimeTraceFull, "and", FileNameCycle)
     TimeTraceFull=pd.read_pickle(FileNameTimeTraceFull,compression='xz')
     Cycle_info=pd.read_csv(FileNameCycle)
     print("Data loaded")
@@ -306,7 +308,7 @@ def LoadDataFromMeasurements():
         DataTotTemp['Time'] = TimeI
         DataTot.append(DataTotTemp)
 
-        FileCycle = pd.read_csv(Folder[j]+'\Cycle.csv')
+        FileCycle = pd.read_csv(Folder[j]+'/Cycle.csv')
         CycleStore = pd.concat([CycleStore, FileCycle], axis=1)
 
     DataTot = pd.concat(DataTot).set_index(['Mes', 'Time'])
@@ -337,8 +339,8 @@ if __name__ == '__main__':
     GeneralPara = {'Experiment_name': 'EMCCDRepeatDiffPos', 'Nb_points': Nb_Points,
                'Distance_Between_Points ': DistancePts,
                'Note': 'The SHG unit from Coherent was used'}
-    #FileDir = '/export/scratch2/constellation-data/EnhancePerov/'
-    FileDir = '~/remote/data/EnhancePerov/output-dummy/'
+    FileDir = '/export/scratch2/constellation-data/EnhancePerov/output-dummy/'
+    #FileDir = '~/remote/data/EnhancePerov/output-dummy/'
     
     # TODO - do these need to be changed for each new batch?
     start_x = 20
@@ -352,7 +354,10 @@ if __name__ == '__main__':
     # generate random initial population
     df_t_cyc, df_p_cyc, df_p_cyc_calib = generateRandomParameters(Nb_Points, Nb_Cycle)
     while number_of_generations < generations_budget:  # generational loop
-        
+        print("################")
+        print("# GENERATION",number_of_generations,"#")
+        print("################")
+
         # run the experiment
         runner.runTimeTrace(StabilityTime, df_t_cyc, df_p_cyc, df_p_cyc_calib)
         
