@@ -20,50 +20,8 @@ import pandas as pd
 import os
 import sys
 import FileControl
-
-def generateRandomParameters(Nb_points, Nb_Cycle):
-    ##############################################################
-    # Parameter space and random choice
-    ##############################################################
-
-    ###################
-    # RNG declaration
-    ###################
-    rng = np.random.default_rng()
-
-    ###################
-    # Proba density function Power
-    ###################
-    P = (0, 4.4, 10, 100, 800)  # power in uW
-    P_calib = (500, 500, 900, 2500, 9200)  # Power from the pp to reach values of P
-    #p0 = [0.2, 0.2, 0.2, 0.2, 0.2]
-    p1 = [0.3, 0.175, 0.175, 0.175, 0.175]
-    ProbaP = p1
-
-    ###################
-    # Proba density function Time
-    ###################
-    t = (0.1, 1, 10, 100)  # time
-    #p0 = [0.25, 0.25, 0.25, 0.25]
-    p1 = [0.3, 0.23, 0.23, 0.24]
-    ProbaT = p1
-
-    df_t_cyc = pd.DataFrame()
-    df_p_cyc = pd.DataFrame()
-    df_p_cyc_calib = pd.DataFrame()
-
-    for k in range(Nb_Points):
-        # Intensity/Power Cycle generation
-        df_t_cyc[k] = rng.choice(t, Nb_Cycle, p=ProbaT)
-        # First we generate an array of cycle which only contains index for the moment
-        temp = rng.choice(np.linspace(0, len(P), len(P), endpoint=False, dtype=int), Nb_Cycle, p=ProbaP)
-        while temp[0] == 0:  # We assume that the first element of P is the zero power element
-            temp = rng.choice(np.linspace(0, len(P), len(P), endpoint=False, dtype=int), Nb_Cycle, p=ProbaP)
-        df_p_cyc_calib[k] = np.array([P_calib[i] for i in temp])
-        df_p_cyc[k] = np.array([P[i] for i in temp])
-
-    return df_t_cyc, df_p_cyc, df_p_cyc_calib
-    
+import glob
+#import spe_loader as sl
 
 class timeTraceRunner:
     def __init__(self, **kwargs):
@@ -72,11 +30,11 @@ class timeTraceRunner:
             raise ValueError('Parameters must contain the number of points [\'Nb_points\']')
         self.Nb_Points = GeneralPara['Nb_points']
 
-    def initialize(self, start_x, end_x, start_y, end_y):
-        runner.initializePiezo(start_x, end_x, start_y, end_y)
-        runner.initializeInstruments()
-        runner.initializeConex()
-        runner.initializeOutputDirectory()
+    def initialize(self, start_x, end_x, start_y, end_y, FileDir):
+        self.initializePiezo(start_x, end_x, start_y, end_y)
+        self.initializeInstruments()
+        self.initializeConex()
+        self.initializeOutputDirectory(FileDir)
 
     #############################
     # Piezo parameter
@@ -141,13 +99,13 @@ class timeTraceRunner:
     #############################
     # Preparation of the directory
     #############################
-    def initializeOutputDirectory(self):
+    def initializeOutputDirectory(self, path):
         print('Directory staging, please check other window')
-        out_dir = None
-        if USE_DUMMY:
-            out_dir = 'output-dummy'
-            if(not os.path.isdir(out_dir)):
-                os.makedirs(out_dir)
+        out_dir = path
+        #if USE_DUMMY:
+        #    out_dir = path + '/output-dummy'
+        if(not os.path.isdir(out_dir)):
+            os.makedirs(out_dir)
         self.DirectoryPath = FileControl.PrepareDirectory(self.GeneralPara, self.InstrumentsPara, out_dir)
 
     #############################
@@ -224,15 +182,154 @@ class timeTraceRunner:
         self.Laser.SetStatusShutterTunable(0)
 
 
+def generateRandomParameters(Nb_Points, Nb_Cycle):
+    ##############################################################
+    # Parameter space and random choice
+    ##############################################################
+
+    ###################
+    # RNG declaration
+    ###################
+    rng = np.random.default_rng()
+
+    ###################
+    # Proba density function Power
+    ###################
+    P = (0, 4.4, 10, 100, 800)  # power in uW
+    P_calib = (500, 500, 900, 2500, 9200)  # Power from the pp to reach values of P
+    #p0 = [0.2, 0.2, 0.2, 0.2, 0.2]
+    p1 = [0.3, 0.175, 0.175, 0.175, 0.175]
+    ProbaP = p1
+
+    ###################
+    # Proba density function Time
+    ###################
+    t = (0.1, 1, 10, 100)  # time
+    #p0 = [0.25, 0.25, 0.25, 0.25]
+    p1 = [0.3, 0.23, 0.23, 0.24]
+    ProbaT = p1
+
+    df_t_cyc = pd.DataFrame()
+    df_p_cyc = pd.DataFrame()
+    df_p_cyc_calib = pd.DataFrame()
+
+    for k in range(Nb_Points):
+        # Intensity/Power Cycle generation
+        df_t_cyc[k] = rng.choice(t, Nb_Cycle, p=ProbaT)
+        # First we generate an array of cycle which only contains index for the moment
+        temp = rng.choice(np.linspace(0, len(P), len(P), endpoint=False, dtype=int), Nb_Cycle, p=ProbaP)
+        while temp[0] == 0:  # We assume that the first element of P is the zero power element
+            temp = rng.choice(np.linspace(0, len(P), len(P), endpoint=False, dtype=int), Nb_Cycle, p=ProbaP)
+        df_p_cyc_calib[k] = np.array([P_calib[i] for i in temp])
+        df_p_cyc[k] = np.array([P[i] for i in temp])
+
+    return df_t_cyc, df_p_cyc, df_p_cyc_calib
+
+def evaluateFitnessValues(FileDir):
+    # Load experimental data
+    DataTot, CycleStore = LoadDataFromFiles(FileDir)
+    Pos, p_cyc, TimeCycle, TimeSync = loadExperimentInfo(DataTot, CycleStore)
+    t_global=pd.Series(TimeCycle.cumsum().iloc[-1,:],index=range(Nb_pts))
+
+    # Wavelength filter
+    WavelengthFilter= [col for col in DataTot.columns if 600 <= col <= 900]
+    TimeTraceU=DataTot[WavelengthFilter].sum(axis=1).unstack(level=0)
+
+    # Compute fitnesses
+    Nb_pts=int(TimeTraceU.shape[1])
+    fitness_values = np.zeros(Nb_pts)
+    for i in range(Nb_pts):
+        temp_df=TimeTraceU.iloc[:,i].dropna()
+        #integrated_int=temp_df.sum()
+        ts=np.argmin(np.abs(temp_df.index-t_global[i]))
+        fitness_values[i] = temp_df.iloc[ts:].mean(axis=0) # insert mean intensity of stability region as fitness value of measurement i
+    return fitness_values
+
+def generateNewSolutions(df_t_cyc, df_p_cyc, df_p_cyc_calib, fitness_values):
+    # TODO - implement selection and variation step of evolutionary algorithm
+    return df_t_cyc, df_p_cyc, df_p_cyc_calib
+
+def loadExperimentInfo(DataTot, CycleStore):
+    Nb_pts=int(DataTot.shape[1])
+    p_cyc=pd.DataFrame(index=range(10), columns=range(Nb_pts))
+    TimeSync=pd.DataFrame(index=range(10), columns=range(Nb_pts))
+    TimeCycle=pd.DataFrame(index=range(10), columns=range(Nb_pts))
+    for i in range(Nb_pts):
+        if i==0:
+            p_cyc.iloc[:,i]=CycleStore.loc[:,'Power send']
+            TimeCycle.iloc[:,i]=CycleStore.loc[:,'Exposure Time']
+            TimeSync.iloc[:,i]=CycleStore.loc[:,'Sync']
+
+        else:
+            p_cyc.iloc[:,i]=CycleStore.loc[:,'Power send.{}'.format(i)]
+            TimeCycle.iloc[:,i]=CycleStore.loc[:,'Exposure Time.{}'.format(i)]
+            TimeSync.iloc[:,i]=CycleStore.loc[:,'Sync.{}'.format(i)]
+
+    Pos=np.zeros([Nb_pts,2])
+    for i in range(Nb_pts):
+        x_temp=float(glob.glob(FileDir+'Mes*')[i].split('x=')[1].split('y=')[0])
+        y_temp=float(glob.glob(FileDir+'Mes*')[i].split('y=')[1])
+        Pos[i,:]=[x_temp,y_temp]
+
+    return Pos, p_cyc, TimeCycle, TimeSync
+    
+def LoadDataFromFiles(FileDir):
+    FileNameTimeTraceFull=FileDir+'TimeTraceFull.pkl'
+    FileNameCycle=FileDir+'BatchCycle.csv'
+    print("Loading data from ", FileNameTimeTraceFull, " and ", FileNameCycle)
+    TimeTraceFull=pd.read_pickle(FileNameTimeTraceFull,compression='xz')
+    Cycle_info=pd.read_csv(FileNameCycle)
+    print("Data loaded")
+    return TimeTraceFull, Cycle_info
+
+# from DataScrapperV2
+def LoadDataFromMeasurements():
+    # Compute wavelength
+    a = 2.354381287460651
+    b = 490.05901104995587
+    PixelNumber = np.linspace(1, 1024, 1024)
+    CenterPixel = 750
+    Wavelength = (PixelNumber-b)/a+CenterPixel
+
+    Folder = glob.glob('./Mes*')
+    CycleStore = pd.DataFrame()
+    DataTot = []
+    for j in range(len(Folder)):
+        File = glob.glob(Folder[j]+'/*spe')
+        DataRaw = sl.load_from_files(File)
+        MetaData = pd.DataFrame(DataRaw.metadata)
+        TimeI = MetaData.loc[:, 0].to_numpy()/(1E6)  # Time in ms
+
+        DataTotTemp = pd.DataFrame(np.squeeze(
+            DataRaw.data[:][:]), columns=Wavelength)
+        DataTotTemp['Mes'] = j
+        DataTotTemp['Time'] = TimeI
+        DataTot.append(DataTotTemp)
+
+        FileCycle = pd.read_csv(Folder[j]+'\Cycle.csv')
+        CycleStore = pd.concat([CycleStore, FileCycle], axis=1)
+
+    DataTot = pd.concat(DataTot).set_index(['Mes', 'Time'])
+
+    #Data.to_pickle("./TimeTraceFull.pkl", compression='xz')
+    #CycleStore.to_csv('./BatchCycle.csv', index=False)
+
+    return DataTot, CycleStore
+
+
 if __name__ == '__main__':
 
     if not USE_DUMMY:
         os.system('cls')
 
     #############################
-    # Parameters
+    # Optimization parameters
     #############################
+    generations_budget = 10
 
+    #############################
+    # TimeTrace parameters
+    #############################
     Nb_Points = 100  # Number of position for the piezo
     Nb_Cycle = 10  # Number of cycle during experiment
     DistancePts = 10
@@ -240,14 +337,30 @@ if __name__ == '__main__':
     GeneralPara = {'Experiment_name': 'EMCCDRepeatDiffPos', 'Nb_points': Nb_Points,
                'Distance_Between_Points ': DistancePts,
                'Note': 'The SHG unit from Coherent was used'}
+    #FileDir = '/export/scratch2/constellation-data/EnhancePerov/'
+    FileDir = '~/remote/data/EnhancePerov/output-dummy/'
     
+    # TODO - do these need to be changed for each new batch?
     start_x = 20
     end_x = 80
     start_y = 20
-    end_y = 80
-    
+    end_y = 80    
     runner = timeTraceRunner(**GeneralPara)
-    runner.initialize(start_x, end_x, start_y, end_y)
+    runner.initialize(start_x, end_x, start_y, end_y, FileDir)
+
+    number_of_generations = 0
+    # generate random initial population
     df_t_cyc, df_p_cyc, df_p_cyc_calib = generateRandomParameters(Nb_Points, Nb_Cycle)
-    runner.runTimeTrace(StabilityTime, df_t_cyc, df_p_cyc, df_p_cyc_calib)
+    while number_of_generations < generations_budget:  # generational loop
+        
+        # run the experiment
+        runner.runTimeTrace(StabilityTime, df_t_cyc, df_p_cyc, df_p_cyc_calib)
+        
+        # calculate fitness values
+        fitness_values = evaluateFitnessValues(FileDir)
+       
+        # update population
+        df_t_cyc, df_p_cyc, df_p_cyc_calib = generateNewSolutions(df_t_cyc, df_p_cyc, df_p_cyc_calib, fitness_values)
+
+        number_of_generations += 1
 
